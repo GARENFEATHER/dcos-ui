@@ -1,7 +1,88 @@
+import path from "path";
 import PluginSDK from "PluginSDK";
 import JestUtil from "../utils/JestUtil";
 import Loader from "./Loader";
 import PluginModules from "./PluginModules";
+
+let _plugins = {};
+let _externalPlugins = {};
+
+const Mocks = {};
+
+let pluginsList;
+let externalPluginsList;
+const pluginsDir = "plugins";
+const externalPluginsDir = path.resolve(
+  process.env.npm_config_externalplugins || "plugins"
+);
+
+try {
+  pluginsList = require("#PLUGINS");
+} catch (err) {
+  pluginsList = {};
+}
+
+try {
+  externalPluginsList = require(externalPluginsDir);
+} catch (err) {
+  externalPluginsList = {};
+}
+
+function __getAvailablePlugins() {
+  return {
+    pluginsList: _plugins,
+    externalPluginsList: _externalPlugins
+  };
+}
+
+function __setMockPlugins(plugins) {
+  _plugins = {};
+  _externalPlugins = {};
+  Object.keys(plugins).forEach(function(pluginID) {
+    if (pluginID in externalPluginsList) {
+      _externalPlugins[pluginID] = plugins[pluginID];
+    } else {
+      _plugins[pluginID] = plugins[pluginID];
+    }
+  });
+}
+
+function __setMockModule(name, mock) {
+  Mocks[name] = mock;
+}
+
+function __requireModule(dir, name) {
+  // Return mock for module
+  if (name in Mocks) {
+    return Mocks[name];
+  }
+
+  if (dir === "internalPlugin") {
+    return require(path.resolve(pluginsDir, name));
+  }
+
+  if (dir === "externalPlugin") {
+    return require(path.resolve(externalPluginsDir, name));
+  }
+
+  return require(path.resolve("./src/js", `${dir}/${name}`));
+}
+
+// Add custom methods for testing
+Loader.__setMockPlugins = __setMockPlugins;
+
+// Rewire so PluginSDK loads the mocked version. But still provide access
+// to original method for PluginTestUtils to load actual plugins
+Loader.__getAvailablePlugins = function() {
+  return {
+    pluginsList,
+    externalPluginsList
+  };
+};
+
+Loader.getAvailablePlugins = __getAvailablePlugins;
+Loader.requireModule = __requireModule;
+Loader.__setMockModule = __setMockModule;
 
 /**
  * Loads whatever plugins are passed in. Could be Mocks
