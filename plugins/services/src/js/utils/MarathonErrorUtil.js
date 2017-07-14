@@ -121,6 +121,15 @@ const MarathonErrorUtil = {
         });
       }
 
+      if (!Array.isArray(errors) || errors.length === 0) {
+        return memo.concat({
+          path: pathComponents,
+          message: error.message,
+          type: MarathonErrorUtil.getErrorType(error.message),
+          variables: {}
+        });
+      }
+
       // For every error, create the correct message
       return errors.reduce(function(memo, errorMessage) {
         memo.push({
